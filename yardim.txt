@@ -1,0 +1,175 @@
+#map {
+  height: 500px;
+}
+
+#info-form {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: white;
+  padding: 10px;
+  z-index: 1000;
+}
+
+.hidden {
+  display: none;
+}
+
+button {
+  margin-top: 10px;
+}
+
+#export-btn {
+  position: absolute;
+  top: 60px;
+  left: 10px;
+  z-index: 1000;
+}
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Leaflet Harita Uygulaması</title>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <div id="info-form" class="hidden">
+    <h2>Bilgi Formu</h2>
+    <form id="location-form">
+      <label for="name">Ad:</label>
+      <input type="text" id="name" required>
+      <label for="surname">Soyad:</label>
+      <input type="text" id="surname" required>
+      <label for="company">Firma:</label>
+      <input type="text" id="company" required>
+      <label for="document-type">Evrak Tipi:</label>
+      <input type="text" id="document-type" required>
+      <label for="stock">Stok:</label>
+      <input type="text" id="stock" required>
+      <label for="exit">Çıkış:</label>
+      <input type="text" id="exit" required>
+      <label for="unit">Birim:</label>
+      <input type="text" id="unit" required>
+      <label for="date">Tarih:</label>
+      <input type="date" id="date" required>
+      <button type="button" id="save-btn">Kaydet</button>
+    </form>
+  </div>
+  <button id="add-location-btn">Konum Ekle</button>
+  <button id="export-btn">Excel'e Aktar</button>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.17.5/dist/xlsx.full.min.js"></script>
+
+</body>
+</html>
+
+
+
+
+let map;
+let markers = [];
+
+document.addEventListener("DOMContentLoaded", function () {
+  map = L.map("map").setView([39.9334, 32.8597], 6);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  document.getElementById("add-location-btn").addEventListener("click", function () {
+    if (markers.length === 0) {
+      map.on("click", function (e) {
+        showInfoForm(e.latlng);
+        map.off("click");
+      });
+    }
+  });
+
+  document.getElementById("save-btn").addEventListener("click", saveLocation);
+  document.getElementById("export-btn").addEventListener("click", exportToExcel);
+});
+
+function showInfoForm(latlng) {
+  document.getElementById("info-form").classList.remove("hidden");
+  document.getElementById("location-form").reset();
+  markers.push(L.marker(latlng).addTo(map));
+}
+
+function saveLocation() {
+  const name = document.getElementById("name").value;
+  const surname = document.getElementById("surname").value;
+  const company = document.getElementById("company").value;
+  const docType = document.getElementById("document-type").value;
+  const stock = document.getElementById("stock").value;
+  const exit = document.getElementById("exit").value;
+  const unit = document.getElementById("unit").value;
+  const date = document.getElementById("date").value;
+
+  const marker = markers.pop();
+  marker.bindPopup(
+    `<b>Ad:</b> ${name} ${surname}<br>` +
+    `<b>Firma:</b> ${company}<br>` +
+    `<b>Evrak Tipi:</b> ${docType}<br>` +
+    `<b>Stok:</b> ${stock}<br>` +
+    `<b>Çıkış:</b> ${exit}<br>` +
+    `<b>Birim:</b> ${unit}<br>` +
+    `<b>Tarih:</b> ${date}`
+  ).openPopup();
+
+  document.getElementById("info-form").classList.add("hidden");
+}
+
+function exportToExcel() {
+  if (markers.length === 0) {
+    alert("There are no markers to export.");
+    return;
+  }
+
+  const data = markers.map(marker => {
+    const latlng = marker.getLatLng();
+    const popupContent = marker.getPopup().getContent();
+    const [name, surname, company, docType, stock, exit, unit, date] = popupContent.split('<br>').map(line => line.replace(/<.*?>/g, ''));
+    return {
+      Latitude: latlng.lat,
+      Longitude: latlng.lng,
+      Name: name.split(':')[1].trim(),
+      Surname: surname.split(':')[1].trim(),
+      Company: company.split(':')[1].trim(),
+      DocumentType: docType.split(':')[1].trim(),
+      Stock: stock.split(':')[1].trim(),
+      Exit: exit.split(':')[1].trim(),
+      Unit: unit.split(':')[1].trim(),
+      Date: date.split(':')[1].trim(),
+    };
+  });
+
+  if (data.length === 0) {
+    alert("There is no data to export.");
+    return;
+  }
+
+  // Convert data to Excel format (you may want to use a library for this)
+  const csvContent = "data:text/csv;charset=utf-8," +
+    Object.keys(data[0]).join(",") + "\n" +
+    data.map(obj => Object.values(obj).join(",")).join("\n");
+
+  // Create a link and trigger a click to download the CSV file
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "marker_data.csv");
+  document.body.appendChild(link);
+  link.click();
+}
